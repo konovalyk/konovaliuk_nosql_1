@@ -22,13 +22,43 @@ function printExplainSummary(title, explainResult) {
 	const stats = explainResult.executionStats;
 	const winningPlan = explainResult.queryPlanner.winningPlan;
 
+	function getLeafStage(plan) {
+		// Walk down common plan shapes to find the deepest "work" stage (e.g. COLLSCAN / IXSCAN).
+		// winningPlan can be:
+		// - { stage, inputStage }
+		// - { stage, inputStages: [...] }
+		// - sharded plans (not expected here, but keep it safe)
+		let cur = plan;
+		const guard = 100;
+		let i = 0;
+		while (cur && i++ < guard) {
+			if (cur.inputStage) {
+				cur = cur.inputStage;
+				continue;
+			}
+			if (cur.inputStages && cur.inputStages.length > 0) {
+				cur = cur.inputStages[0];
+				continue;
+			}
+			if (cur.shards) {
+				const shardKeys = Object.keys(cur.shards);
+				if (shardKeys.length > 0) {
+					cur = cur.shards[shardKeys[0]].winningPlan || cur.shards[shardKeys[0]];
+					continue;
+				}
+			}
+			break;
+		}
+		return cur?.stage ?? null;
+	}
+
 	print(`\n=== ${title} ===`);
 	print(`Winning plan stage: ${winningPlan.stage || "N/A"}`);
 	print(`totalKeysExamined: ${stats.totalKeysExamined ?? 0}`);
 	print(`totalDocsExamined: ${stats.totalDocsExamined ?? 0}`);
 	print(`nReturned: ${stats.nReturned ?? 0}`);
 	print(`executionTimeMillis: ${stats.executionTimeMillis ?? 0}`);
-	print(`Input stage: ${winningPlan.inputStage ? winningPlan.inputStage.stage : "N/A"}`);
+	print(`Leaf stage: ${getLeafStage(winningPlan) ?? "N/A"}`);
 }
 
 const query = {
@@ -36,7 +66,8 @@ const query = {
 	"audio_features.danceability": { $gte: 0.7 }
 };
 
-print("\n=== ЗАВДАННЯ 4.1: Аналіз без індексів ===");
+print("\n=== ЗАВДАННЯ 4.1: Аналіз запиту та індексація ===");
+print("\n[4.1.1] Аналіз без індексів");
 dropNonDefaultIndexes(collection);
 
 const explainBefore = collection
@@ -46,7 +77,7 @@ const explainBefore = collection
 
 printExplainSummary("Без індексів", explainBefore);
 
-print("\n=== ЗАВДАННЯ 4.2: Створення індексу ===");
+print("\n[4.1.2] Створення індексу");
 const indexName = collection.createIndex({
 	track_genres: 1,
 	popularity: -1,
@@ -55,7 +86,7 @@ const indexName = collection.createIndex({
 print(`Створено індекс: ${indexName}`);
 print(`Структура: { track_genres: 1, popularity: -1, 'audio_features.danceability': 1 }`);
 
-print("\n=== ЗАВДАННЯ 4.3: Аналіз після індексу ===");
+print("\n[4.1.3] Аналіз після індексу");
 const explainAfter = collection
 	.find(query)
 	.sort({ popularity: -1 })
@@ -68,7 +99,7 @@ print(`Документів переглянуто: ${explainBefore.executionSta
 print(`Ключів переглянуто: ${explainBefore.executionStats.totalKeysExamined ?? 0} → ${explainAfter.executionStats.totalKeysExamined ?? 0}`);
 print(`Час виконання: ${explainBefore.executionStats.executionTimeMillis ?? 0} → ${explainAfter.executionStats.executionTimeMillis ?? 0} ms`);
 
-print("\n=== ЗАВДАННЯ 4.2: Індекс для work tracks ===");
+print("\n=== ЗАВДАННЯ 4.2: Індекс для інших полів (work tracks) ===");
 dropNonDefaultIndexes(collection);
 
 const workQuery = {
@@ -78,13 +109,13 @@ const workQuery = {
 	explicit: false
 };
 
-print("\n[4.2.1] Аналіз без індексів для work tracks");
+print("\n[4.2.1] Аналіз без індексів");
 const workExplainBefore = collection
 	.find(workQuery)
 	.explain("executionStats");
 printExplainSummary("Work tracks без індексів", workExplainBefore);
 
-print("\n[4.2.2] Створення індексу для work tracks");
+print("\n[4.2.2] Створення індексу");
 const workIndexName = collection.createIndex({
 	explicit: 1,
 	"audio_features.instrumentalness": 1,
@@ -93,13 +124,13 @@ const workIndexName = collection.createIndex({
 print(`Створено індекс: ${workIndexName}`);
 print(`Структура: { explicit: 1, 'audio_features.instrumentalness': 1, 'audio_features.speechiness': 1 }`);
 
-print("\n[4.2.3] Аналіз після індексу для work tracks");
+print("\n[4.2.3] Аналіз після індексу");
 const workExplainAfter = collection
 	.find(workQuery)
 	.explain("executionStats");
 printExplainSummary("Work tracks після індексу", workExplainAfter);
 
-print("\n[4.2.4] Порівняння work tracks");
+print("\n[4.2.4] Порівняння");
 print(`Документів переглянуто: ${workExplainBefore.executionStats.totalDocsExamined ?? 0} → ${workExplainAfter.executionStats.totalDocsExamined ?? 0}`);
 print(`Ключів переглянуто: ${workExplainBefore.executionStats.totalKeysExamined ?? 0} → ${workExplainAfter.executionStats.totalKeysExamined ?? 0}`);
 print(`Час виконання: ${workExplainBefore.executionStats.executionTimeMillis ?? 0} → ${workExplainAfter.executionStats.executionTimeMillis ?? 0} ms`);
@@ -107,7 +138,7 @@ print(`Час виконання: ${workExplainBefore.executionStats.executionTi
 
 print("\n=== ЗАВДАННЯ 4.3: Покривний запит ===");
 print("Запит:");
-print("db.tracks.find({ track_genres: 'pop', popularity: { $gte: 70 } });");
+print("db.tracks_by_genres.find({ track_genres: 'pop', popularity: { $gte: 70 } });");
 
 const coveredQuery = {
 	track_genres: "pop",
@@ -129,12 +160,32 @@ print(JSON.stringify({
 	covered_before: {
 		totalDocsExamined: coveredExplain.executionStats.totalDocsExamined ?? 0,
 		nReturned: coveredExplain.executionStats.nReturned ?? 0,
-		inputStage: coveredExplain.queryPlanner.winningPlan.inputStage ? coveredExplain.queryPlanner.winningPlan.inputStage.stage : null
+		winningPlanStage: coveredExplain.queryPlanner.winningPlan.stage ?? null,
+		leafStage: (() => {
+			const plan = coveredExplain.queryPlanner.winningPlan;
+			let cur = plan;
+			for (let i = 0; i < 100; i++) {
+				if (cur?.inputStage) cur = cur.inputStage;
+				else if (cur?.inputStages?.length) cur = cur.inputStages[0];
+				else break;
+			}
+			return cur?.stage ?? null;
+		})()
 	},
 	covered_after: {
 		totalDocsExamined: coveredExplainAfterIndex.executionStats.totalDocsExamined ?? 0,
 		nReturned: coveredExplainAfterIndex.executionStats.nReturned ?? 0,
-		inputStage: coveredExplainAfterIndex.queryPlanner.winningPlan.inputStage ? coveredExplainAfterIndex.queryPlanner.winningPlan.inputStage.stage : null
+		winningPlanStage: coveredExplainAfterIndex.queryPlanner.winningPlan.stage ?? null,
+		leafStage: (() => {
+			const plan = coveredExplainAfterIndex.queryPlanner.winningPlan;
+			let cur = plan;
+			for (let i = 0; i < 100; i++) {
+				if (cur?.inputStage) cur = cur.inputStage;
+				else if (cur?.inputStages?.length) cur = cur.inputStages[0];
+				else break;
+			}
+			return cur?.stage ?? null;
+		})()
 	}
 }));
 
@@ -154,7 +205,16 @@ print(JSON.stringify({
 		nReturned: actualCoveredQuery.executionStats.nReturned ?? 0,
 		executionTimeMillis: actualCoveredQuery.executionStats.executionTimeMillis ?? 0,
 		winningPlanStage: actualCoveredQuery.queryPlanner.winningPlan.stage || null,
-		inputStage: actualCoveredQuery.queryPlanner.winningPlan.inputStage ? actualCoveredQuery.queryPlanner.winningPlan.inputStage.stage : null
+		leafStage: (() => {
+			const plan = actualCoveredQuery.queryPlanner.winningPlan;
+			let cur = plan;
+			for (let i = 0; i < 100; i++) {
+				if (cur?.inputStage) cur = cur.inputStage;
+				else if (cur?.inputStages?.length) cur = cur.inputStages[0];
+				else break;
+			}
+			return cur?.stage ?? null;
+		})()
 	}
 }));
 

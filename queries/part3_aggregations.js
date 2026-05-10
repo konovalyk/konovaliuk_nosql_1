@@ -22,13 +22,13 @@ const topArtists = spotifyDb.tracks_by_genres.aggregate([
 	{
 		$group: {
 			_id: "$artists",
-			trackCount: { $sum: 5 },
+			trackCount: { $sum: 1 },
 			avgPopularity: { $avg: "$popularity" }
 		}
 	},
 	{
 		$match: {
-			trackCount: { $gte: 1 }
+			trackCount: { $gte: 5 }
 		}
 	},
 	{
@@ -37,12 +37,42 @@ const topArtists = spotifyDb.tracks_by_genres.aggregate([
 	{
 		$limit: 10
 	},
+	// Use $lookup on existing project data (no synthetic collections):
+	// for each artist, fetch their most popular track.
+	{
+		$lookup: {
+			from: "tracks_by_genres",
+			let: { artist: "$_id" },
+			pipeline: [
+				{ $match: { $expr: { $in: ["$$artist", "$artists"] } } },
+				{ $sort: { popularity: -1 } },
+				{ $limit: 1 },
+				{
+					$project: {
+						_id: 0,
+						track_name: 1,
+						popularity: 1,
+						track_genres: 1
+					}
+				}
+			],
+			as: "top_track"
+		}
+	},
+	{
+		$unwind: {
+			path: "$top_track",
+			preserveNullAndEmptyArrays: true
+		}
+	},
 	{
 		$project: {
 			_id: 0,
 			artist: "$_id",
 			avgPopularity: { $round: ["$avgPopularity", 1] },
-			trackCount: 1
+			trackCount: 1,
+			top_track: "$top_track.track_name",
+			top_track_popularity: "$top_track.popularity"
 		}
 	}
 ], { allowDiskUse: true }).toArray();
@@ -51,6 +81,9 @@ print(`Знайдено виконавців: ${topArtists.length}`);
 topArtists.forEach((artist, index) => {
 	print(`${index + 1}. ${artist.artist}`);
 	print(`   Середня популярність: ${artist.avgPopularity}, Треків: ${artist.trackCount}`);
+	if (artist.top_track) {
+		print(`   Топ-трек: ${artist.top_track} (popularity: ${artist.top_track_popularity})`);
+	}
 });
 
 print("\n=== ЗАВДАННЯ 2: Розподіл треків за настроєм ===");
