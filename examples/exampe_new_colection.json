@@ -1,0 +1,99 @@
+// Приклад плаского документа з колекції tracks_raw до трансформації та завантаження даних.
+[
+{
+  "_id": {
+    "$oid": "69ff0c79b674a103b474a930"
+  },
+  "Unnamed: 0": 0,
+  "track_id": "5SuOikwiRyPMVoIQDJUgSV",
+  "artists": "Gen Hoshino",
+  "album_name": "Comedy",
+  "track_name": "Comedy",
+  "popularity": 73,
+  "duration_ms": 230666,
+  "explicit": false,
+  "danceability": 0.676,
+  "energy": 0.461,
+  "key": 1,
+  "loudness": -6.746,
+  "mode": 0,
+  "speechiness": 0.143,
+  "acousticness": 0.0322,
+  "instrumentalness": 0.00000101,
+  "liveness": 0.358,
+  "valence": 0.715,
+  "tempo": 87.917,
+  "time_signature": 4,
+  "track_genre": "acoustic"
+},
+
+// Приклад документа з колекції tracks після трансформації та завантаження даних.
+
+{
+  "_id": {
+    "$oid": "69ff0c79b674a103b474a93b"
+  },
+  "track_id": "5ivF4eQBqJiVL5IAE9jRyl",
+  "album_name": "Love Is a Four Letter Word",
+  "track_name": "I Won't Give Up",
+  "popularity": 69,
+  "duration_ms": 240165,
+  "explicit": false,
+  "track_genre": "acoustic",
+  "artists": [
+    "Jason Mraz"
+  ],
+  "audio_features": {
+    "danceability": 0.483,
+    "energy": 0.303,
+    "loudness": -10.058,
+    "speechiness": 0.0429,
+    "acousticness": 0.694,
+    "instrumentalness": 0,
+    "liveness": 0.115,
+    "valence": 0.139,
+    "tempo": 133.406,
+    "key": 4,
+    "mode": 1,
+    "time_signature": 3
+  },
+  "duration_sec": 240.2,
+  "popularity_tier": "medium"
+},
+
+// Приклад документа з колекції tracks_by_genres після трансформації агрегації жанрів.
+
+{
+  "_id": {
+    "$oid": "69ff0d32b674a103b475dac8"
+  },
+  "track_id": "59OAM7U77A9f0mQbEsF6XT",
+  "album_name": "Karneval Klassiker",
+  "track_name": "Sünderlein",
+  "popularity": 0,
+  "duration_ms": 240920,
+  "explicit": false,
+  "artists": [
+    "Brings"
+  ],
+  "audio_features": {
+    "danceability": 0.57,
+    "energy": 0.904,
+    "loudness": -2.876,
+    "speechiness": 0.0601,
+    "acousticness": 0.00284,
+    "instrumentalness": 0,
+    "liveness": 0.253,
+    "valence": 0.478,
+    "tempo": 128.985,
+    "key": 0,
+    "mode": 1,
+    "time_signature": 4
+  },
+  "duration_sec": 240.9,
+  "popularity_tier": "low",
+  "track_genres": [
+    "party"
+  ]
+}
+]
